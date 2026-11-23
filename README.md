@@ -1,6 +1,6 @@
 # ХК «Феррум» — GitHub Pages
 
-Сайт: https://southfamily-hockey.github.io/ferrum-hockey/
+Сайт: https://ferrum-hockey.github.io/
 
 Отдельная копия сайта. Cloudflare Pages, Worker бота, D1 и матчевый Cron не меняются.
 GitHub Actions только читает их публичные данные, без токенов Telegram/Cloudflare.
