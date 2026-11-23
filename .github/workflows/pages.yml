@@ -1,0 +1,73 @@
+name: Publish Ferrum
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['.sync-state.json']
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ferrum-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.snapshot.outputs.changed }}
+      fingerprint: ${{ steps.snapshot.outputs.fingerprint }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - name: Verify exporter
+        run: node --test tests/snapshot.test.mjs
+      - name: Build public snapshot
+        id: snapshot
+        env:
+          FORCE_BUILD: ${{ github.event_name != 'schedule' }}
+        run: node scripts/build.mjs
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: steps.snapshot.outputs.changed == 'true'
+        with:
+          path: dist
+          retention-days: 1
+  deploy:
+    if: needs.build.outputs.changed == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+  record:
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Record successful snapshot without media
+        env:
+          FINGERPRINT: ${{ needs.build.outputs.fingerprint }}
+        run: |
+          node --input-type=module -e "import fs from 'node:fs';if(!/^[a-f0-9]{64}$/.test(process.env.FINGERPRINT))process.exit(1);fs.writeFileSync('.sync-state.json',JSON.stringify({fingerprint:process.env.FINGERPRINT,publishedAt:new Date().toISOString()},null,2)+'\n')"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- .sync-state.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m 'Record published snapshot'
+          git push origin HEAD:main
