@@ -1,0 +1,12 @@
+{
+  "name": "ferrum-hockey-pages",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs --force"
+  }
+}
